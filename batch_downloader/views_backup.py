@@ -15,7 +15,7 @@ from django_ratelimit.decorators import ratelimit
 from .models import DownloadJob, ProductBatch, ImageItem
 from .forms import CSVUploadForm, BatchDataForm
 from .validators import deduplicate_images_per_product
-from .tasks import start_download_job
+# from .tasks import start_download_job  # Removed - using SimpleDownloadService instead
 from .services.zip_service import zip_service
 
 
@@ -301,33 +301,12 @@ def job_progress_stream(request, job_id):
 def system_check(request):
     """System health check view"""
     from django.conf import settings
-    import redis
-    from celery import current_app
     import os
     
     checks = {
         'database': True,  # If we got here, database is working
-        'redis': False,
-        'celery': False,
         'media_write': False,
     }
-    
-    # Check Redis
-    try:
-        r = redis.from_url(settings.CELERY_BROKER_URL)
-        r.ping()
-        checks['redis'] = True
-    except:
-        pass
-    
-    # Check Celery
-    try:
-        inspect = current_app.control.inspect()
-        stats = inspect.stats()
-        if stats:
-            checks['celery'] = True
-    except:
-        pass
     
     # Check media directory write permissions
     try:

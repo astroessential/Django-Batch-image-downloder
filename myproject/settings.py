@@ -48,7 +48,6 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
     'django_htmx',
     'widget_tweaks',
-    'django_celery_results',
     'storages',
     
     # Local apps
@@ -146,17 +145,6 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Celery Configuration - DISABLED for simplicity
-# CELERY_BROKER_URL = env.str('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-# CELERY_RESULT_BACKEND = env.str('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
-CELERY_TASK_ALWAYS_EAGER = True  # Execute tasks synchronously
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
-CELERY_BEAT_SCHEDULER = 'django_celery_results.schedulers:DatabaseScheduler'
-CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', False)  # For testing
-
 # Download Configuration
 MAX_GLOBAL_CONCURRENCY = env.int('MAX_GLOBAL_CONCURRENCY', 32)
 MAX_PER_HOST_CONCURRENCY = env.int('MAX_PER_HOST_CONCURRENCY', 4)
@@ -178,5 +166,5 @@ if MEDIA_BACKEND == 's3':
     AWS_S3_FILE_OVERWRITE = False
     AWS_DEFAULT_ACL = None
 
-# Celery Worker Configuration
-CELERY_WORKER_CONCURRENCY = env.int('CELERY_WORKER_CONCURRENCY', 8)
+# Worker concurrency configuration for download service
+DOWNLOAD_WORKER_CONCURRENCY = env.int('CELERY_WORKER_CONCURRENCY', 8)
