@@ -1,0 +1,779 @@
+{% extends 'batch_downloader/base.html' %}
+
+{% block title %}Job {{ job.short_id }} - Batch Image Downloader{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Job Header -->
+        <div class="card card-custom mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h2 class="card-title mb-3">Job #{{ job.short_id }}</h2>
+                        
+                        <!-- Overall Progress Bar -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-medium">Overall Progress</span>
+                                <span class="text-muted">{{ job.completed_images }}/{{ job.total_images }} images</span>
+                            </div>
+                            <div class="progress progress-bar-custom">
+                                <div class="progress-bar {% if job.status == 'RUNNING' %}progress-bar-striped progress-bar-animated{% endif %}" 
+                                     role="progressbar" 
+                                     style="width: {{ job.progress_percentage }}%"
+                                     id="overall-progress">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Stats -->
+                        <div class="d-flex flex-wrap gap-3">
+                            <span class="badge bg-primary fs-6">{{ job.total_products }} Products</span>
+                            <span class="badge bg-info fs-6">{{ job.total_images }} Images</span>
+                            <span class="badge bg-success fs-6">{{ job.completed_images }} Completed</span>
+                            {% if job.failed_images > 0 %}
+                                <span class="badge bg-danger fs-6">{{ job.failed_images }} Failed</span>
+                            {% endif %}
+                            <span class="badge bg-secondary fs-6">{{ total_size_mb }} MB</span>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                        <!-- Job Status -->
+                        <div class="mb-3">
+                            <span class="badge status-badge 
+                                {% if job.status == 'PENDING' %}bg-secondary
+                                {% elif job.status == 'RUNNING' %}bg-info
+                                {% elif job.status == 'PAUSED' %}bg-warning
+                                {% elif job.status == 'COMPLETED' %}bg-success
+                                {% elif job.status == 'FAILED' %}bg-danger
+                                {% elif job.status == 'CANCELLED' %}bg-dark
+                                {% else %}bg-warning{% endif %}">
+                                {{ job.get_status_display }}
+                            </span>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2">
+                            <!-- Job Control Buttons -->
+                            {% if job.status == 'RUNNING' %}
+                                <button type="button" class="btn btn-warning btn-custom-sm" id="pause-job-btn" onclick="pauseJob()">
+                                    ⏸️ Pause Job
+                                </button>
+                            {% elif job.status == 'PAUSED' %}
+                                <button type="button" class="btn btn-success btn-custom-sm" id="resume-job-btn" onclick="resumeJob()">
+                                    ▶️ Resume Job
+                                </button>
+                            {% endif %}
+                            
+                            {% if job.status in 'RUNNING,PAUSED' %}
+                                <button type="button" class="btn btn-danger btn-custom-sm" id="cancel-job-btn" onclick="cancelJob()">
+                                    ⏹️ Cancel Job
+                                </button>
+                            {% endif %}
+                            
+                            {% if job.status in 'FAILED,CANCELLED' %}
+                                <button type="button" class="btn btn-info btn-custom-sm" id="restart-job-btn" onclick="restartJob()">
+                                    🔄 Restart Job
+                                </button>
+                            {% endif %}
+                            
+                            <!-- Download Button -->
+                            <button type="button" class="btn btn-primary btn-custom-sm" id="download-all-btn"
+                                    {% if not job.has_ready_zips %}disabled{% endif %}>
+                                📦 Download All Zips
+                            </button>
+                            
+                            <button type="button" class="btn btn-outline-secondary btn-custom-sm" onclick="location.reload()">
+                                🔄 Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sort Controls -->
+        {% if product_batches %}
+        <div class="card card-custom mb-3">
+            <div class="card-body py-3">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h6 class="mb-0">Products ({{ product_batches|length }})</h6>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center justify-content-end gap-2">
+                            <small class="text-muted">Sort by:</small>
+                            <select class="form-select form-select-sm" id="sort-by" style="width: auto;">
+                                <option value="natural" {% if sort_by == 'natural' %}selected{% endif %}>Natural (PROD1, PROD2, PROD10)</option>
+                                <option value="alphabetical" {% if sort_by == 'alphabetical' %}selected{% endif %}>Alphabetical</option>
+                                <option value="status" {% if sort_by == 'status' %}selected{% endif %}>Status</option>
+                                <option value="created" {% if sort_by == 'created' %}selected{% endif %}>Creation Order</option>
+                            </select>
+                            <select class="form-select form-select-sm" id="sort-order" style="width: auto;">
+                                <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>↑ Ascending</option>
+                                <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>↓ Descending</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Products Grid -->
+        <div class="row g-3" id="products-grid">
+            {% for product in product_batches %}
+                {% include 'batch_downloader/_product_card.html' with product=product %}
+            {% endfor %}
+        </div>
+        
+        {% if not product_batches %}
+            <div class="text-center py-5">
+                <h4 class="text-muted">No products found</h4>
+                <p class="text-muted">This job doesn't have any products yet.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Connection Status Indicator -->
+<div id="connection-status" class="position-fixed bottom-0 start-0 m-3" style="z-index: 1050;">
+    <div class="badge bg-success" id="connected-badge">🟢 Connected</div>
+    <div class="badge bg-danger d-none" id="disconnected-badge">🔴 Disconnected</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Real-time updates via Server-Sent Events
+let eventSource;
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 5;
+let jobCompleted = false;
+
+function connectSSE() {
+    // Don't connect if job is already completed
+    if (jobCompleted) {
+        console.log('Job is completed, skipping SSE connection');
+        return;
+    }
+    
+    console.log('Connecting to SSE stream...');
+    updateConnectionStatus(true);
+    
+    // Close existing connection if any
+    if (eventSource) {
+        eventSource.close();
+    }
+    
+    const streamUrl = `{% url 'batch_downloader:job_progress_stream' job.id %}`;
+    eventSource = new EventSource(streamUrl);
+    
+    eventSource.onopen = function(event) {
+        console.log('SSE connection opened');
+        updateConnectionStatus(true);
+        reconnectAttempts = 0;
+    };
+    
+    eventSource.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('SSE message:', data);
+            
+            // Check if this is the final update
+            if (data.final_update || (data.job && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.job.status))) {
+                jobCompleted = true;
+                console.log('Job completed, closing SSE connection');
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+                updateConnectionStatus(false, 'Job completed');
+            }
+            
+            handleProgressUpdate(data);
+        } catch (error) {
+            console.error('Error parsing SSE message:', error, event.data);
+        }
+    };
+    
+    eventSource.onerror = function(event) {
+        console.error('SSE error:', event);
+        updateConnectionStatus(false);
+        
+        // Don't reconnect if job is completed
+        if (jobCompleted) {
+            console.log('Job completed, not reconnecting');
+            return;
+        }
+        
+        if (eventSource.readyState === EventSource.CLOSED) {
+            // Connection was closed, try to reconnect
+            if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                console.log(`Reconnecting... (attempt ${reconnectAttempts})`);
+                setTimeout(connectSSE, 2000 * reconnectAttempts);
+            } else {
+                console.log('Max reconnection attempts reached, falling back to polling');
+                startPolling();
+            }
+        }
+    };
+}
+
+function startPolling() {
+    // Don't start polling if job is already completed
+    if (jobCompleted) {
+        console.log('Job is completed, skipping polling');
+        return;
+    }
+    
+    console.log('Falling back to polling for updates...');
+    // Poll every 3 seconds for job updates (fallback only)
+    const pollingInterval = setInterval(function() {
+        // Stop polling if job completed externally
+        if (jobCompleted) {
+            clearInterval(pollingInterval);
+            return;
+        }
+        
+        fetch(window.location.href, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.job) {
+                handleProgressUpdate({
+                    type: 'job.totals_updated',
+                    job: data.job,
+                    products: data.products
+                });
+                
+                // Stop polling if job is complete
+                if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.job.status)) {
+                    jobCompleted = true;
+                    clearInterval(pollingInterval);
+                    updateConnectionStatus(false, 'Job completed');
+                    console.log('Job finished, stopping polling');
+                }
+            }
+        })
+        .catch(error => {
+            console.log('Polling error:', error);
+            // Don't clear interval on error - keep trying
+        });
+    }, 3000);
+}
+
+function handleProgressUpdate(data) {
+    console.log('Progress update:', data);
+    
+    // Handle both SSE data format and polling data format
+    if (data.job && data.products) {
+        // This is the format we send from SSE - update directly
+        updateJobFromSSE(data.job, data.products);
+    } else if (data.type) {
+        // Handle legacy event-style data (for compatibility)
+        switch (data.type) {
+            case 'job.totals_updated':
+            case 'job.status_changed':
+                updateJobProgress(data);
+                break;
+                
+            case 'image.completed':
+            case 'image.failed':
+            case 'image.skipped':
+                updateProductProgress(data);
+                break;
+                
+            case 'product.completed':
+                updateProductStatus(data);
+                break;
+                
+            case 'product.zip_ready':
+                updateProductZipStatus(data);
+                break;
+        }
+    }
+}
+
+function updateJobFromSSE(job, products) {
+    // This function handles data from SSE stream
+    updateJobFromPolling(job, products);  // Same logic works for both
+    
+    // Update product table rows with more detailed data
+    updateProductTable(products);
+}
+
+function updateJobFromPolling(job, products) {
+    // Update overall progress bar
+    const progressBar = document.getElementById('overall-progress');
+    if (progressBar) {
+        progressBar.style.width = job.progress_percentage + '%';
+        progressBar.setAttribute('aria-valuenow', job.progress_percentage);
+        
+        // Update animation classes based on status
+        if (job.status === 'RUNNING') {
+            progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+        } else {
+            progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        }
+    }
+    
+    // Update job stats - find the badge elements properly
+    const statsBadges = document.querySelectorAll('.badge');
+    statsBadges.forEach(badge => {
+        const text = badge.textContent;
+        if (text.includes('Completed')) {
+            badge.textContent = `${job.completed_images} Completed`;
+        } else if (text.includes('Failed')) {
+            badge.textContent = `${job.failed_images} Failed`;
+            if (job.failed_images === 0) {
+                badge.style.display = 'none';
+            } else {
+                badge.style.display = 'inline-block';
+            }
+        } else if (text.includes('MB')) {
+            badge.textContent = `${job.total_size_mb} MB`;
+        }
+    });
+    
+    // Update the completion counter in the progress text
+    const progressText = document.querySelector('.text-muted');
+    if (progressText && progressText.textContent.includes('/')) {
+        progressText.textContent = `${job.completed_images}/${job.total_images} images`;
+    }
+    
+    // Update job status badge
+    const statusBadge = document.querySelector('.status-badge');
+    if (statusBadge) {
+        statusBadge.textContent = job.status;
+        statusBadge.className = 'badge status-badge ' + 
+            (job.status === 'PENDING' ? 'bg-secondary' :
+             job.status === 'RUNNING' ? 'bg-info' :
+             job.status === 'COMPLETED' ? 'bg-success' :
+             job.status === 'FAILED' ? 'bg-danger' : 'bg-warning');
+    }
+    
+    // Update product cards
+    products.forEach(product => {
+        const productCard = document.querySelector(`[data-product="${product.product_number}"]`);
+        if (productCard) {
+            // Update product status badge
+            const statusBadge = productCard.querySelector('.product-status-badge');
+            if (statusBadge) {
+                statusBadge.textContent = product.status;
+                statusBadge.className = 'badge product-status-badge ' + 
+                    (product.status === 'PENDING' ? 'bg-secondary' :
+                     product.status === 'RUNNING' ? 'bg-info' :
+                     product.status === 'DONE' ? 'bg-success' :
+                     product.status === 'FAILED' ? 'bg-danger' : 
+                     product.status === 'PARTIAL' ? 'bg-warning' : 'bg-secondary');
+            }
+            
+            // Update progress bar
+            const progressBar = productCard.querySelector('.product-progress-bar');
+            if (progressBar) {
+                progressBar.style.width = product.progress_percentage + '%';
+                
+                // Update animation classes
+                if (product.status === 'RUNNING') {
+                    progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+                } else {
+                    progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                }
+            }
+            
+            // Update product stats
+            const statsText = productCard.querySelector('.product-stats');
+            if (statsText) {
+                let statsString = `Images: ${product.downloaded_count}/${product.image_count}`;
+                if (product.failed_count && product.failed_count > 0) {
+                    statsString += ` • Failed: ${product.failed_count}`;
+                }
+                if (product.bytes_downloaded_mb && product.bytes_downloaded_mb > 0) {
+                    statsString += ` • Size: ${product.bytes_downloaded_mb} MB`;
+                }
+                statsText.textContent = statsString;
+            }
+            
+            // Update download button
+            const downloadBtn = productCard.querySelector('.download-zip-btn');
+            if (downloadBtn) {
+                if (product.zip_ready) {
+                    downloadBtn.disabled = false;
+                    downloadBtn.classList.remove('btn-outline-secondary');
+                    downloadBtn.classList.add('btn-primary');
+                } else {
+                    downloadBtn.disabled = true;
+                    downloadBtn.classList.add('btn-outline-secondary');
+                    downloadBtn.classList.remove('btn-primary');
+                }
+            }
+        }
+    });
+    
+    // Enable download all button if any product has a ready ZIP
+    const downloadAllBtn = document.getElementById('download-all-btn');
+    if (downloadAllBtn) {
+        const hasReadyZips = products.some(p => p.zip_ready);
+        downloadAllBtn.disabled = !hasReadyZips;
+    }
+}
+
+function updateProductTable(products) {
+    // Update product table if it exists (Tabulator or regular table)
+    const table = document.querySelector('#products-table table');
+    if (!table) return;
+    
+    products.forEach(product => {
+        // Find the table row for this product
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const productCell = row.querySelector('td:first-child');
+            if (productCell && productCell.textContent.trim() === product.product_number) {
+                // Update status cell
+                const statusCell = row.querySelector('.badge');
+                if (statusCell) {
+                    statusCell.textContent = product.status;
+                    statusCell.className = 'badge ' + 
+                        (product.status === 'PENDING' ? 'bg-secondary' :
+                         product.status === 'RUNNING' ? 'bg-info' :
+                         product.status === 'DONE' ? 'bg-success' :
+                         product.status === 'FAILED' ? 'bg-danger' : 
+                         product.status === 'PARTIAL' ? 'bg-warning' : 'bg-secondary');
+                }
+                
+                // Update progress cell
+                const progressCell = row.querySelector('.progress-bar');
+                if (progressCell) {
+                    progressCell.style.width = product.progress_percentage + '%';
+                    progressCell.textContent = product.progress_percentage + '%';
+                    
+                    if (product.status === 'RUNNING') {
+                        progressCell.classList.add('progress-bar-striped', 'progress-bar-animated');
+                    } else {
+                        progressCell.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                    }
+                }
+                
+                // Update images count cell
+                const imagesCell = row.querySelector('.images-count');
+                if (imagesCell) {
+                    imagesCell.textContent = `${product.downloaded_count}/${product.image_count}`;
+                }
+                
+                // Update size cell
+                const sizeCell = row.querySelector('.size-cell');
+                if (sizeCell) {
+                    sizeCell.textContent = `${product.size_mb} MB`;
+                }
+                
+                // Update download button
+                const downloadBtn = row.querySelector('.download-zip-btn');
+                if (downloadBtn) {
+                    if (product.zip_ready) {
+                        downloadBtn.disabled = false;
+                        downloadBtn.classList.remove('btn-outline-secondary');
+                        downloadBtn.classList.add('btn-primary');
+                    } else {
+                        downloadBtn.disabled = true;
+                        downloadBtn.classList.add('btn-outline-secondary');
+                        downloadBtn.classList.remove('btn-primary');
+                    }
+                }
+            }
+        });
+    });
+}
+
+function updateJobProgress(data) {
+    // Update overall progress bar
+    const progressBar = document.getElementById('overall-progress');
+    if (progressBar) {
+        progressBar.style.width = data.progress_percentage + '%';
+        
+        // Update progress classes
+        if (data.status === 'RUNNING') {
+            progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+        } else {
+            progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        }
+    }
+    
+    // Update stats badges
+    const completedBadge = document.querySelector('.badge.bg-success');
+    if (completedBadge && data.completed_images !== undefined) {
+        completedBadge.textContent = `${data.completed_images} Completed`;
+    }
+    
+    const failedBadge = document.querySelector('.badge.bg-danger');
+    if (failedBadge && data.failed_images !== undefined) {
+        failedBadge.textContent = `${data.failed_images} Failed`;
+        if (data.failed_images === 0) {
+            failedBadge.style.display = 'none';
+        } else {
+            failedBadge.style.display = 'inline-block';
+        }
+    }
+    
+    // Update job status badge
+    if (data.status) {
+        const statusBadge = document.querySelector('.badge.status-badge');
+        if (statusBadge) {
+            statusBadge.textContent = data.status;
+            
+            // Update badge color
+            statusBadge.className = 'badge status-badge ';
+            switch (data.status) {
+                case 'PENDING':
+                    statusBadge.className += 'bg-secondary';
+                    break;
+                case 'RUNNING':
+                    statusBadge.className += 'bg-info';
+                    break;
+                case 'COMPLETED':
+                    statusBadge.className += 'bg-success';
+                    break;
+                case 'FAILED':
+                    statusBadge.className += 'bg-danger';
+                    break;
+                default:
+                    statusBadge.className += 'bg-warning';
+            }
+        }
+    }
+}
+
+function updateProductProgress(data) {
+    const productCard = document.querySelector(`[data-product="${data.product_number}"]`);
+    if (!productCard) return;
+    
+    // Update progress bar
+    const progressBar = productCard.querySelector('.product-progress-bar');
+    if (progressBar && data.progress_percentage !== undefined) {
+        progressBar.style.width = data.progress_percentage + '%';
+    }
+    
+    // Update stats
+    const statsText = productCard.querySelector('.product-stats');
+    if (statsText && data.downloaded_count !== undefined && data.total_count !== undefined) {
+        const failedText = data.failed_count > 0 ? ` • Failed: ${data.failed_count}` : '';
+        const sizeText = data.bytes_downloaded ? ` • Size: ${(data.bytes_downloaded / (1024*1024)).toFixed(2)} MB` : '';
+        statsText.textContent = `Images: ${data.downloaded_count}/${data.total_count}${failedText}${sizeText}`;
+    }
+}
+
+function updateProductStatus(data) {
+    const productCard = document.querySelector(`[data-product="${data.product_number}"]`);
+    if (!productCard) return;
+    
+    // Update status badge
+    const statusBadge = productCard.querySelector('.product-status-badge');
+    if (statusBadge && data.status) {
+        statusBadge.textContent = data.status;
+        
+        // Update badge color
+        statusBadge.className = 'badge ';
+        switch (data.status) {
+            case 'PENDING':
+                statusBadge.className += 'bg-secondary';
+                break;
+            case 'RUNNING':
+                statusBadge.className += 'bg-info';
+                break;
+            case 'DONE':
+                statusBadge.className += 'bg-success';
+                break;
+            case 'FAILED':
+                statusBadge.className += 'bg-danger';
+                break;
+            case 'PARTIAL':
+                statusBadge.className += 'bg-warning';
+                break;
+        }
+    }
+}
+
+function updateProductZipStatus(data) {
+    const productCard = document.querySelector(`[data-product="${data.product_number}"]`);
+    if (!productCard) return;
+    
+    // Enable download button
+    const downloadBtn = productCard.querySelector('.download-zip-btn');
+    if (downloadBtn) {
+        downloadBtn.disabled = false;
+        downloadBtn.classList.remove('btn-outline-secondary');
+        downloadBtn.classList.add('btn-primary');
+    }
+    
+    // Enable download all button if any product is ready
+    const downloadAllBtn = document.getElementById('download-all-btn');
+    if (downloadAllBtn) {
+        downloadAllBtn.disabled = false;
+    }
+}
+
+function updateConnectionStatus(connected, message = null) {
+    const connectedBadge = document.getElementById('connected-badge');
+    const disconnectedBadge = document.getElementById('disconnected-badge');
+    
+    if (connected) {
+        connectedBadge.classList.remove('d-none');
+        disconnectedBadge.classList.add('d-none');
+    } else {
+        connectedBadge.classList.add('d-none');
+        disconnectedBadge.classList.remove('d-none');
+        
+        // Update disconnect message if provided
+        if (message) {
+            const disconnectText = disconnectedBadge.querySelector('.text-muted') || disconnectedBadge;
+            if (disconnectText !== disconnectedBadge) {
+                disconnectText.textContent = message;
+            }
+        }
+    }
+}
+
+// Download all zips
+document.getElementById('download-all-btn').addEventListener('click', function() {
+    window.location.href = `{% url 'batch_downloader:download_job_zip' job_id=job.id %}`;
+});
+
+// Job control functions
+function pauseJob() {
+    if (confirm('Are you sure you want to pause this job?')) {
+        fetch(`{% url 'batch_downloader:pause_job' job_id=job.id %}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to pause job'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error pausing job');
+        });
+    }
+}
+
+function resumeJob() {
+    if (confirm('Resume this job? Downloads will continue from where they left off.')) {
+        fetch(`{% url 'batch_downloader:resume_job' job_id=job.id %}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to resume job'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error resuming job');
+        });
+    }
+}
+
+function cancelJob() {
+    if (confirm('Cancel this job? This will stop all downloads and cannot be undone.')) {
+        fetch(`{% url 'batch_downloader:cancel_job' job_id=job.id %}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to cancel job'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error cancelling job');
+        });
+    }
+}
+
+function restartJob() {
+    if (confirm('Restart this job? This will reset the progress and start downloading again.')) {
+        fetch(`{% url 'batch_downloader:restart_job' job_id=job.id %}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to restart job'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error restarting job');
+        });
+    }
+}
+
+// Initialize SSE connection
+document.addEventListener('DOMContentLoaded', function() {
+    // Check initial job status
+    const currentStatus = '{{ job.status }}';
+    if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(currentStatus)) {
+        jobCompleted = true;
+        updateConnectionStatus(false, 'Job completed');
+        console.log('Job already completed, skipping SSE connection');
+    } else {
+        connectSSE();
+    }
+});
+
+// Sort functionality
+document.getElementById('sort-by').addEventListener('change', updateSort);
+document.getElementById('sort-order').addEventListener('change', updateSort);
+
+function updateSort() {
+    const sortBy = document.getElementById('sort-by').value;
+    const sortOrder = document.getElementById('sort-order').value;
+    
+    const url = new URL(window.location);
+    url.searchParams.set('sort_by', sortBy);
+    url.searchParams.set('sort_order', sortOrder);
+    
+    window.location.href = url.toString();
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (eventSource) {
+        eventSource.close();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Batch Image Downloader{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Tabulator CSS -->
+    <link href="https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator_bootstrap5.min.css" rel="stylesheet">
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    
+    <style>
+        .progress-bar-custom {
+            height: 12px;
+            border-radius: 0.6rem;
+        }
+        
+        .progress-bar-product {
+            height: 10px;
+            border-radius: 0.5rem;
+        }
+        
+        .card-custom {
+            border-radius: 0.75rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        
+        .btn-custom-lg {
+            height: 44px;
+            min-width: 200px;
+            border-radius: 0.6rem;
+        }
+        
+        .btn-custom-sm {
+            height: 34px;
+        }
+        
+        .table-container {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            overflow: hidden;
+        }
+        
+        /* Tabulator validation styles */
+        .required-field {
+            position: relative;
+        }
+
+        .tabulator-validation-fail {
+            background-color: #ffe6e6 !important;
+            border: 1px solid #ff4444 !important;
+        }
+
+        .tabulator-validation-fail input {
+            background-color: #ffe6e6 !important;
+            border-color: #ff4444 !important;
+        }
+
+        .tabulator-cell {
+            vertical-align: middle;
+        }
+
+        .url-indicator {
+            font-size: 0.8em;
+            margin-right: 0.25rem;
+        }
+        
+        .product-card {
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        
+        .footer-muted {
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+        
+        .validation-summary {
+            border-radius: 0.375rem;
+        }
+        
+        /* Custom scrollbar for table */
+        .tabulator::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .tabulator::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        .tabulator::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        .tabulator::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{% url 'batch_downloader:landing' %}">
+                📥 Batch Image Downloader
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{% url 'batch_downloader:landing' %}">New Job</a>
+                <a class="nav-link" href="{% url 'batch_downloader:job_list' %}">Jobs</a>
+                <a class="nav-link" href="/admin/">Admin</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container my-4">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-8">
+                    <p class="footer-muted mb-1">
+                        We don't store links beyond your job scope. Large jobs run in the background.
+                    </p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <a href="{% url 'batch_downloader:system_check' %}" class="text-muted text-decoration-none">
+                        System Status
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Tabulator JS -->
+    <script src="https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script>
+        // Toast notification helper
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toast-container') || createToastContainer();
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-bg-${type} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+            
+            // Remove toast element after it's hidden
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        }
+        
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(container);
+            return container;
+        }
+        
+        // HTMX event listeners
+        document.addEventListener('htmx:responseError', function(event) {
+            showToast('An error occurred. Please try again.', 'danger');
+        });
+        
+        document.addEventListener('htmx:timeout', function(event) {
+            showToast('Request timed out. Please try again.', 'warning');
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

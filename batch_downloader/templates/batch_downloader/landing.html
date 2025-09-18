@@ -1,0 +1,858 @@
+{% extends 'batch_downloader/base.html' %}
+
+{% block title %}Batch Image Downloader{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <!-- Header -->
+        <div class="text-center mb-5">
+            <h1 class="display-5 fw-bold mb-3">Batch Image Downloader</h1>
+            <p class="lead text-muted">
+                Paste two columns: <strong>Product Number</strong>, <strong>Image Src</strong>. Or import CSV file.
+            </p>
+            <div class="alert alert-info d-inline-block">
+                💡 <strong>Tip:</strong> Each row must have both fields filled. Use sample_data.csv as a reference.
+            </div>
+        </div>
+
+        <!-- Main Form Area -->
+        <div class="card card-custom p-4 mb-4">
+            <!-- Action Buttons -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="paste-btn">
+                            📋 Paste Data
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#csvModal">
+                            📁 Import CSV
+                        </button>
+                        <button type="button" class="btn btn-outline-warning btn-sm" id="remove-incomplete-btn" title="Remove rows missing Product Number or Image Src">
+                            🧹 Remove Incomplete
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="clear-btn">
+                            🗑️ Clear All
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-success btn-sm" onclick="addSampleData()">
+                            📊 Load Sample
+                        </button>
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="addEmptyRow()">
+                            ➕ Add Row
+                        </button>
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="addMultipleRows()">
+                            ➕➕ Add Multiple
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Toolbar -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <h6 class="mb-0">📊 Data Management</h6>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="btn-toolbar justify-content-end" role="toolbar">
+                                        <!-- Export Group -->
+                                        <div class="btn-group me-2" role="group">
+                                            <button type="button" class="btn btn-outline-success btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                                                📥 Export
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="#" onclick="exportToCsv()">📄 CSV</a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="exportToExcel()">📊 Excel</a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="exportToJson()">🔧 JSON</a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item" href="#" onclick="printTable()">🖨️ Print</a></li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <!-- Data Group -->
+                                        <div class="btn-group me-2" role="group">
+                                            <button type="button" class="btn btn-outline-info btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                                                💾 Data
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="#" onclick="saveDataToLocal()">💾 Save Backup</a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="loadDataFromLocal()">📂 Load Backup</a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item" href="#" onclick="validateAllRows()">✅ Validate All</a></li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <!-- Tools Group -->
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="table.getSelectedData().length > 0 ? table.deleteRow(table.getSelectedRows()) : showToast('warning', 'No rows selected')">
+                                                🗑️ Delete Selected
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="table.selectRow('all')">
+                                                📋 Select All
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress and Statistics -->
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-primary me-2" id="row-count">0 rows</span>
+                        <span class="badge bg-success me-2" id="valid-count">0 valid</span>
+                        <span class="badge bg-warning me-2" id="invalid-count">0 invalid</span>
+                        <span class="badge bg-secondary" id="empty-count">0 empty</span>
+                    </div>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 0%" id="completion-progress"></div>
+                    </div>
+                    <small class="text-muted" id="completion-text">0% complete</small>
+                </div>
+            </div>
+
+            <!-- Data Statistics -->
+            <div class="data-stats mb-3">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <small class="text-muted">Total Rows:</small>
+                        <strong id="total-rows">0</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted">Valid Rows:</small>
+                        <strong id="valid-rows">0</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted">Products:</small>
+                        <strong id="product-count">0</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="table-container mb-4">
+                <div id="data-table"></div>
+            </div>
+
+            <!-- Validation Summary (Hidden initially) -->
+            <div id="validation-summary" class="alert alert-danger validation-summary d-none">
+                <h6 class="alert-heading">Validation Errors:</h6>
+                <ul id="validation-errors" class="mb-0"></ul>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="d-grid">
+                <button type="button" class="btn btn-primary btn-lg btn-custom-lg" id="submit-btn">
+                    🚀 Analyze & Queue Downloads
+                </button>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">📊 Step 1: Prepare Data</h5>
+                        <p class="card-text">Paste or import data with exactly two columns: Product Number and Image Src URL.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">⚡ Step 2: Process</h5>
+                        <p class="card-text">We'll validate URLs, group by product, and start downloading images in the background.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">📦 Step 3: Download</h5>
+                        <p class="card-text">Get ZIP files per product or download all products together. Track progress in real-time.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CSV Upload Modal -->
+<div class="modal fade" id="csvModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'batch_downloader:upload_csv' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Import CSV File</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        {{ csv_form.csv_file.label_tag }}
+                        {{ csv_form.csv_file }}
+                        <div class="form-text">
+                            CSV file should have headers: <strong>Product Number</strong>, <strong>Image Src</strong><br>
+                            📝 See <code>sample_data.csv</code> in project folder for format example
+                        </div>
+                    </div>
+                    {% if csv_form.csv_file.errors %}
+                        <div class="alert alert-danger">
+                            {{ csv_form.csv_file.errors }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Import & Process</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden form for table data submission -->
+<form id="batch-form" method="post" action="{% url 'batch_downloader:create_job' %}" style="display: none;">
+    {% csrf_token %}
+    {{ batch_form.batch_data }}
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Initialize Tabulator table
+const table = new Tabulator("#data-table", {
+    height: "500px",
+    layout: "fitColumns",
+    placeholder: "Click 'Load Sample', 'Paste from Clipboard', or 'Import CSV' to add data",
+    validationMode: "highlight",
+    editTrigger: "dblclick",
+    clipboard: true,
+    clipboardPasteAction: "replace",
+    clipboardCopyConfig: {
+        columnHeaders: true,
+        columnGroups: false,
+        rowGroups: false,
+        columnCalcs: false,
+        dataTree: false,
+        formatCells: false,
+    },
+    // Excel-like features
+    resizableColumns: true,
+    resizableRows: true,
+    movableColumns: true,
+    selectable: true,
+    selectableRangeMode: "click",
+    addRowPos: "bottom",
+    history: true, // Enable undo/redo
+    keybindings: {
+        "deleteRow": "delete",
+        "insertRowBelow": "ctrl+enter",
+        "undo": "ctrl+z",
+        "redo": "ctrl+y",
+        "copyToClipboard": "ctrl+c",
+        "pasteFromClipboard": "ctrl+v",
+    },
+    columns: [
+        {
+            title: "Row",
+            field: "rownum",
+            width: 60,
+            headerSort: false,
+            editor: false,
+            frozen: true,
+            formatter: function(cell, formatterParams, onRendered) {
+                return cell.getRow().getPosition();
+            },
+            cssClass: "row-number"
+        },
+        {
+            title: "Product Number *",
+            field: "product_number",
+            width: 180,
+            editor: "input",
+            validator: ["required"],
+            headerSort: false,
+            resizable: true,
+            cssClass: "required-field",
+            editorParams: {
+                placeholder: "Enter product number..."
+            }
+        },
+        {
+            title: "Image URL *",
+            field: "image_src",
+            minWidth: 400,
+            editor: "input",
+            validator: ["required"],
+            headerSort: false,
+            resizable: true,
+            cssClass: "required-field",
+            editorParams: {
+                placeholder: "https://example.com/image.jpg"
+            },
+            formatter: function(cell, formatterParams, onRendered) {
+                const value = cell.getValue();
+                if (value && value.trim()) {
+                    try {
+                        new URL(value);
+                        return `<span class="url-indicator text-success me-1">✓</span><span class="url-text">${value}</span>`;
+                    } catch (e) {
+                        return `<span class="url-indicator text-danger me-1">⚠</span><span class="url-text">${value}</span>`;
+                    }
+                }
+                return `<span class="text-muted">Enter image URL...</span>`;
+            }
+        },
+        {
+            title: "Status",
+            field: "validation_status",
+            width: 100,
+            headerSort: false,
+            editor: false,
+            formatter: function(cell, formatterParams, onRendered) {
+                const row = cell.getRow().getData();
+                const hasProduct = row.product_number && row.product_number.trim();
+                const hasUrl = row.image_src && row.image_src.trim();
+                
+                if (hasProduct && hasUrl) {
+                    try {
+                        new URL(row.image_src);
+                        return '<span class="badge bg-success">Valid</span>';
+                    } catch (e) {
+                        return '<span class="badge bg-warning">Invalid URL</span>';
+                    }
+                } else if (!hasProduct && !hasUrl) {
+                    return '<span class="badge bg-secondary">Empty</span>';
+                } else {
+                    return '<span class="badge bg-danger">Incomplete</span>';
+                }
+            }
+        },
+        {
+            title: "Actions",
+            field: "actions",
+            width: 120,
+            headerSort: false,
+            formatter: function(cell, formatterParams, onRendered) {
+                return `
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary btn-sm" onclick="duplicateRow(this)" title="Duplicate">📋</button>
+                        <button class="btn btn-outline-success btn-sm" onclick="insertRowAfter(this)" title="Insert Below">➕</button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteRow(this)" title="Delete">🗑️</button>
+                    </div>
+                `;
+            }
+        }
+    ],
+    data: [],
+    
+    // Excel-like keyboard navigation
+    tabEndNewRow: true,
+    
+    // Auto-expand table
+    reactiveData: true,
+    
+    // Context menu (right-click)
+    contextMenu: [
+        {
+            label: "Insert Row Above",
+            action: function(e, row) {
+                row.getTable().addRow({}, true, row);
+                updateDataStats();
+            }
+        },
+        {
+            label: "Insert Row Below", 
+            action: function(e, row) {
+                row.getTable().addRow({}, false, row);
+                updateDataStats();
+            }
+        },
+        {
+            separator: true,
+        },
+        {
+            label: "Duplicate Row",
+            action: function(e, row) {
+                const data = row.getData();
+                row.getTable().addRow({...data}, false, row);
+                updateDataStats();
+            }
+        },
+        {
+            separator: true,
+        },
+        {
+            label: "Delete Row",
+            action: function(e, row) {
+                row.delete();
+                updateDataStats();
+            }
+        }
+    ]
+});
+
+// Update stats when table data changes
+table.on("dataChanged", function(data){
+    updateDataStats();
+});
+
+table.on("rowAdded", function(row){
+    updateDataStats();
+});
+
+table.on("rowDeleted", function(row){
+    updateDataStats();
+});
+
+table.on("cellEdited", function(cell){
+    updateDataStats();
+});
+
+// Add sample data for demonstration
+function addSampleData() {
+    const sampleData = [
+        {product_number: "PROD001", image_src: "https://via.placeholder.com/800x600/blue/white?text=Image1"},
+        {product_number: "PROD001", image_src: "https://via.placeholder.com/800x600/red/white?text=Image2"},
+        {product_number: "PROD002", image_src: "https://via.placeholder.com/800x600/orange/white?text=Image3"},
+    ];
+    table.setData(sampleData);
+    updateDataStats();
+    showToast('Sample data loaded', 'success');
+}
+
+// Delete row function
+function deleteRow(button) {
+    const row = table.getRow(button.closest('.tabulator-row'));
+    row.delete();
+    updateDataStats();
+    showToast('Row deleted', 'info');
+}
+
+// Duplicate row function
+function duplicateRow(button) {
+    const row = table.getRow(button.closest('.tabulator-row'));
+    const data = row.getData();
+    table.addRow({...data}, false, row);
+    updateDataStats();
+    showToast('Row duplicated', 'info');
+}
+
+// Insert row after function
+function insertRowAfter(button) {
+    const row = table.getRow(button.closest('.tabulator-row'));
+    table.addRow({product_number: "", image_src: ""}, false, row);
+    updateDataStats();
+    showToast('Row inserted', 'info');
+}
+
+// Add empty row
+function addEmptyRow() {
+    table.addRow({product_number: "", image_src: ""});
+    updateDataStats();
+}
+
+// Add multiple empty rows
+function addMultipleRows() {
+    const count = prompt("How many empty rows to add?", "5");
+    if (count && !isNaN(count) && count > 0) {
+        for (let i = 0; i < parseInt(count); i++) {
+            table.addRow({product_number: "", image_src: ""}, false);
+        }
+        updateDataStats();
+        showToast(`Added ${count} empty rows`, 'success');
+    }
+}
+
+// Update data statistics
+function updateDataStats() {
+    const data = table.getData();
+    const validRows = data.filter(row => row.product_number && row.image_src);
+    const productCount = new Set(validRows.map(row => row.product_number)).size;
+    
+    document.getElementById('total-rows').textContent = data.length;
+    document.getElementById('valid-rows').textContent = validRows.length;
+    document.getElementById('product-count').textContent = productCount;
+}
+
+// Paste from clipboard
+document.getElementById('paste-btn').addEventListener('click', async function() {
+    try {
+        // Check if clipboard API is available
+        if (!navigator.clipboard) {
+            showToast('Clipboard access not available. Use Ctrl+V in the table or click "Add Row" to input manually.', 'warning');
+            addEmptyRow();
+            return;
+        }
+
+        const text = await navigator.clipboard.readText();
+        
+        if (!text.trim()) {
+            showToast('Clipboard is empty. Adding an empty row for manual input.', 'info');
+            addEmptyRow();
+            return;
+        }
+        
+        // Parse clipboard data (try tab separation first, then comma)
+        const lines = text.trim().split('\n');
+        const data = [];
+        
+        lines.forEach((line, index) => {
+            // Try tab separation first (Excel), then comma (CSV)
+            let columns = line.split('\t');
+            if (columns.length < 2) {
+                columns = line.split(',');
+            }
+            
+            if (columns.length >= 2) {
+                // Skip header row if it contains typical header text
+                const isHeader = index === 0 && 
+                    (columns[0].toLowerCase().includes('product') || 
+                     columns[1].toLowerCase().includes('image') ||
+                     columns[1].toLowerCase().includes('src') ||
+                     columns[1].toLowerCase().includes('url'));
+                
+                if (!isHeader) {
+                    data.push({
+                        product_number: columns[0].trim(),
+                        image_src: columns[1].trim()
+                    });
+                }
+            }
+        });
+        
+        if (data.length > 0) {
+            table.setData(data);
+            updateDataStats();
+            showToast(`Pasted ${data.length} rows from clipboard`, 'success');
+        } else {
+            showToast('No valid data found. Adding empty row for manual input.', 'warning');
+            addEmptyRow();
+        }
+        
+    } catch (err) {
+        console.error('Failed to read clipboard:', err);
+        showToast('Failed to read clipboard. Adding empty row for manual input.', 'warning');
+        addEmptyRow();
+    }
+});
+
+// Clear table
+document.getElementById('clear-btn').addEventListener('click', function() {
+    table.clearData();
+    updateDataStats();
+    hideValidationSummary();
+    showToast('Table cleared', 'info');
+});
+
+// Remove incomplete rows
+document.getElementById('remove-incomplete-btn').addEventListener('click', function() {
+    const data = table.getData();
+    const beforeCount = data.length;
+    
+    // Filter out rows that are missing either product_number or image_src
+    const completeData = data.filter(row => {
+        const hasProductNumber = row.product_number && row.product_number.trim() !== '';
+        const hasImageSrc = row.image_src && row.image_src.trim() !== '';
+        return hasProductNumber && hasImageSrc;
+    });
+    
+    const removedCount = beforeCount - completeData.length;
+    
+    if (removedCount > 0) {
+        table.setData(completeData);
+        updateDataStats();
+        hideValidationSummary();
+        showToast(`Removed ${removedCount} incomplete row(s). ${completeData.length} complete rows remaining.`, 'success');
+    } else {
+        showToast('No incomplete rows found to remove.', 'info');
+    }
+});
+
+// Submit form
+document.getElementById('submit-btn').addEventListener('click', function() {
+    const data = table.getData();
+    
+    if (data.length === 0) {
+        showToast('Please add some data first', 'warning');
+        return;
+    }
+    
+    // Validate data before submission
+    let hasErrors = false;
+    const errors = [];
+    
+    data.forEach((row, index) => {
+        const rowNum = index + 2; // +2 because we start from row 2 (after header)
+        
+        if (!row.product_number || row.product_number.trim() === '') {
+            errors.push(`Row ${rowNum}: Product Number is required`);
+            hasErrors = true;
+        }
+        
+        if (!row.image_src || row.image_src.trim() === '') {
+            errors.push(`Row ${rowNum}: Image Src is required`);
+            hasErrors = true;
+        } else {
+            // Basic URL validation
+            try {
+                new URL(row.image_src);
+            } catch (e) {
+                errors.push(`Row ${rowNum}: Invalid URL format`);
+                hasErrors = true;
+            }
+        }
+    });
+    
+    if (hasErrors) {
+        showToast('Validation errors found:', 'danger');
+        errors.forEach(error => showToast(error, 'danger'));
+        return;
+    }
+    
+    // Convert to array format expected by backend
+    const formattedData = [
+        ['Product Number', 'Image Src'],
+        ...data.map(row => [row.product_number || '', row.image_src || ''])
+    ];
+    
+    // Set form data and submit
+    document.getElementById('id_batch_data').value = JSON.stringify(formattedData);
+    
+    // Show loading state
+    const submitBtn = this;
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '⏳ Processing...';
+    submitBtn.disabled = true;
+    
+    // Submit via fetch for better error handling
+    const form = document.getElementById('batch-form');
+    const formData = new FormData(form);
+    
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            if (data.warnings && data.warnings.length > 0) {
+                data.warnings.forEach(warning => showToast(warning, 'warning'));
+            }
+            // Redirect to job page
+            setTimeout(() => {
+                window.location.href = data.job_url;
+            }, 1000);
+        } else {
+            showValidationErrors(data.errors);
+            showToast('Please fix validation errors', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('An error occurred. Please try again.', 'danger');
+    })
+    .finally(() => {
+        // Restore button state
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+// Validation error display
+function showValidationErrors(errors) {
+    const summary = document.getElementById('validation-summary');
+    const errorsList = document.getElementById('validation-errors');
+    
+    errorsList.innerHTML = '';
+    
+    if (Array.isArray(errors)) {
+        errors.forEach(error => {
+            const li = document.createElement('li');
+            li.textContent = error;
+            errorsList.appendChild(li);
+        });
+    } else {
+        for (const [field, fieldErrors] of Object.entries(errors)) {
+            fieldErrors.forEach(error => {
+                const li = document.createElement('li');
+                li.textContent = `${field}: ${error}`;
+                errorsList.appendChild(li);
+            });
+        }
+    }
+    
+    summary.classList.remove('d-none');
+    summary.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function hideValidationSummary() {
+    document.getElementById('validation-summary').classList.add('d-none');
+}
+
+// Add sample data on load for demo
+document.addEventListener('DOMContentLoaded', function() {
+    // Uncomment to add sample data on load
+    // addSampleData();
+});
+
+// Handle Enter key in table
+table.on("keyDown", function(e, cell){
+    if(e.keyCode == 13){ // Enter key
+        const data = table.getData();
+        if (data.length >= 2 && data.every(row => row.product_number && row.image_src)) {
+            document.getElementById('submit-btn').click();
+        }
+    }
+});
+
+// Add multiple empty rows at once
+function addMultipleRows() {
+    const count = prompt("How many rows would you like to add?", "5");
+    if (count && !isNaN(count) && parseInt(count) > 0) {
+        const rowsToAdd = parseInt(count);
+        const newRows = [];
+        for (let i = 0; i < rowsToAdd; i++) {
+            newRows.push({
+                product_name: '',
+                product_link: '',
+                validation_status: 'empty'
+            });
+        }
+        table.addData(newRows);
+        showToast('success', `Added ${rowsToAdd} empty rows`);
+    }
+}
+
+// Export data functions
+function exportToCsv() {
+    table.download("csv", "product_data.csv");
+    showToast('success', 'Data exported to CSV');
+}
+
+function exportToExcel() {
+    table.download("xlsx", "product_data.xlsx", {sheetName:"Product Data"});
+    showToast('success', 'Data exported to Excel');
+}
+
+function exportToJson() {
+    table.download("json", "product_data.json");
+    showToast('success', 'Data exported to JSON');
+}
+
+// Print table
+function printTable() {
+    table.print(false, true);
+}
+
+// Save/Load functionality (localStorage)
+function saveDataToLocal() {
+    const data = table.getData();
+    localStorage.setItem('product_data_backup', JSON.stringify(data));
+    showToast('success', 'Data saved to browser storage');
+}
+
+function loadDataFromLocal() {
+    const saved = localStorage.getItem('product_data_backup');
+    if (saved) {
+        const data = JSON.parse(saved);
+        table.replaceData(data);
+        showToast('success', `Loaded ${data.length} rows from browser storage`);
+    } else {
+        showToast('warning', 'No saved data found in browser storage');
+    }
+}
+
+// Enhanced validation
+function validateAllRows() {
+    const data = table.getData();
+    let validCount = 0;
+    let invalidCount = 0;
+    
+    data.forEach(row => {
+        if (row.product_name && row.product_link) {
+            if (isValidUrl(row.product_link)) {
+                table.updateRow(row.id, {validation_status: 'valid'});
+                validCount++;
+            } else {
+                table.updateRow(row.id, {validation_status: 'invalid'});
+                invalidCount++;
+            }
+        } else {
+            table.updateRow(row.id, {validation_status: 'incomplete'});
+            invalidCount++;
+        }
+    });
+    
+    showToast('info', `Validation complete: ${validCount} valid, ${invalidCount} invalid rows`);
+}
+
+function isValidUrl(string) {
+    try {
+        new URL(string);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+// Update statistics
+function updateStatistics() {
+    const data = table.getData();
+    const totalRows = data.length;
+    let validCount = 0;
+    let invalidCount = 0;
+    let emptyCount = 0;
+    
+    data.forEach(row => {
+        if (!row.product_number || !row.image_src) {
+            emptyCount++;
+        } else if (isValidUrl(row.image_src)) {
+            validCount++;
+        } else {
+            invalidCount++;
+        }
+    });
+    
+    // Update badges
+    document.getElementById('row-count').textContent = `${totalRows} rows`;
+    document.getElementById('valid-count').textContent = `${validCount} valid`;
+    document.getElementById('invalid-count').textContent = `${invalidCount} invalid`;
+    document.getElementById('empty-count').textContent = `${emptyCount} empty`;
+    
+    // Update progress bar
+    const completionPercentage = totalRows > 0 ? Math.round((validCount / totalRows) * 100) : 0;
+    document.getElementById('completion-progress').style.width = `${completionPercentage}%`;
+    document.getElementById('completion-text').textContent = `${completionPercentage}% complete`;
+}
+
+// Auto-update statistics when data changes
+table.on("dataChanged", updateStatistics);
+table.on("dataLoaded", updateStatistics);
+table.on("rowAdded", updateStatistics);
+table.on("rowDeleted", updateStatistics);
+table.on("cellEdited", updateStatistics);
+
+// Initialize statistics
+setTimeout(updateStatistics, 100);
+</script>
+{% endblock %}

@@ -1,0 +1,214 @@
+{% extends 'batch_downloader/base.html' %}
+
+{% block title %}Job Management{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="row justify-content-center">
+    <div class="col-lg-12">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="display-6 fw-bold mb-2">Job Management</h1>
+                <p class="lead text-muted mb-0">Manage your download jobs</p>
+            </div>
+            <div>
+                <a href="{% url 'batch_downloader:landing' %}" class="btn btn-primary">
+                    ➕ Create New Job
+                </a>
+            </div>
+        </div>
+
+        <!-- Jobs List -->
+        <div class="card card-custom">
+            <div class="card-body">
+                {% if jobs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Job ID</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Products</th>
+                                    <th>Images</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for job in jobs %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'batch_downloader:job_detail' job_id=job.id %}" class="text-decoration-none">
+                                            <code>{{ job.short_id }}</code>
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if job.status == 'RUNNING' %}bg-primary
+                                            {% elif job.status == 'COMPLETED' %}bg-success
+                                            {% elif job.status == 'FAILED' %}bg-danger
+                                            {% elif job.status == 'CANCELLED' %}bg-secondary
+                                            {% else %}bg-warning{% endif %}">
+                                            {{ job.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="width: 100px; height: 8px;">
+                                            <div class="progress-bar 
+                                                {% if job.status == 'RUNNING' %}bg-primary
+                                                {% elif job.status == 'COMPLETED' %}bg-success
+                                                {% elif job.status == 'FAILED' %}bg-danger
+                                                {% else %}bg-warning{% endif %}" 
+                                                style="width: {{ job.progress_percentage }}%"></div>
+                                        </div>
+                                        <small class="text-muted">{{ job.progress_percentage }}%</small>
+                                    </td>
+                                    <td>{{ job.total_products }}</td>
+                                    <td>
+                                        <span class="text-success">{{ job.completed_images }}</span> /
+                                        <span class="text-muted">{{ job.total_images }}</span>
+                                        {% if job.failed_images > 0 %}
+                                            <br><small class="text-danger">{{ job.failed_images }} failed</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ job.created_at|date:"M d, Y H:i" }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'batch_downloader:job_detail' job_id=job.id %}" 
+                                               class="btn btn-outline-primary btn-sm" title="View Details">
+                                                👁️
+                                            </a>
+                                            
+                                            {% if job.status in 'FAILED,CANCELLED' %}
+                                            <button class="btn btn-outline-warning btn-sm" 
+                                                    onclick="restartJob('{{ job.id }}')" title="Restart">
+                                                🔄
+                                            </button>
+                                            {% endif %}
+                                            
+                                            {% if job.status in 'PENDING,RUNNING' %}
+                                            <button class="btn btn-outline-secondary btn-sm" 
+                                                    onclick="cancelJob('{{ job.id }}')" title="Cancel">
+                                                ⏹️
+                                            </button>
+                                            {% endif %}
+                                            
+                                            {% if job.has_ready_zips %}
+                                            <a href="{% url 'batch_downloader:download_job_zip' job_id=job.id %}" 
+                                               class="btn btn-outline-success btn-sm" title="Download All">
+                                                📦
+                                            </a>
+                                            {% endif %}
+                                            
+                                            <button class="btn btn-outline-danger btn-sm" 
+                                                    onclick="deleteJob('{{ job.id }}')" title="Delete">
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <h4 class="text-muted mb-3">No jobs yet</h4>
+                        <p class="text-muted mb-4">Create your first download job to get started</p>
+                        <a href="{% url 'batch_downloader:landing' %}" class="btn btn-primary">
+                            ➕ Create First Job
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function deleteJob(jobId) {
+    if (confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
+        fetch(`/jobs/${jobId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to delete job'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting job');
+        });
+    }
+}
+
+function restartJob(jobId) {
+    if (confirm('Restart this job? This will reset the progress and start downloading again.')) {
+        fetch(`/jobs/${jobId}/restart/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to restart job'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error restarting job');
+        });
+    }
+}
+
+function cancelJob(jobId) {
+    if (confirm('Cancel this job? This will stop all downloads.')) {
+        fetch(`/jobs/${jobId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to cancel job'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error cancelling job');
+        });
+    }
+}
+
+// Auto-refresh every 30 seconds
+setInterval(() => {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,105 @@
+<!-- Product Card Template -->
+<div class="col-lg-4 col-md-6">
+    <div class="card product-card card-custom h-100" data-product="{{ product.product_number }}">
+        <!-- Card Header -->
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h6 class="card-title mb-0 fw-bold">Product {{ product.product_number }}</h6>
+            <span class="badge product-status-badge 
+                {% if product.status == 'PENDING' %}bg-secondary
+                {% elif product.status == 'RUNNING' %}bg-info
+                {% elif product.status == 'DONE' %}bg-success
+                {% elif product.status == 'FAILED' %}bg-danger
+                {% elif product.status == 'PARTIAL' %}bg-warning
+                {% endif %}">
+                {{ product.get_status_display }}
+            </span>
+        </div>
+        
+        <!-- Card Body -->
+        <div class="card-body">
+            <!-- Progress Bar -->
+            <div class="mb-3">
+                <div class="progress progress-bar-product">
+                    <div class="progress-bar product-progress-bar 
+                        {% if product.status == 'RUNNING' %}progress-bar-striped progress-bar-animated{% endif %}" 
+                         role="progressbar" 
+                         style="width: {{ product.progress_percentage }}%">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stats -->
+            <div class="row g-2 mb-3">
+                <div class="col-12">
+                    <small class="text-muted product-stats">
+                        Images: {{ product.downloaded_count }}/{{ product.image_count }}
+                        {% if product.failed_count > 0 %} • Failed: {{ product.failed_count }}{% endif %}
+                        {% if product.bytes_downloaded > 0 %} • Size: {{ product.bytes_downloaded_mb }} MB{% endif %}
+                    </small>
+                </div>
+            </div>
+            
+            <!-- Error Messages (if any) -->
+            {% if product.status == 'FAILED' or product.status == 'PARTIAL' %}
+                {% if product.failed_images %}
+                    <div class="mb-3">
+                        <details class="small">
+                            <summary class="text-danger">
+                                <small>View Errors ({{ product.failed_count }})</small>
+                            </summary>
+                            <div class="mt-2 p-2 bg-light rounded">
+                                {% for image in product.failed_images|slice:":3" %}
+                                    <div class="mb-1">
+                                        <small class="text-danger">{{ image.error_message|truncatechars:80 }}</small>
+                                    </div>
+                                {% endfor %}
+                                {% if product.failed_count > 3 %}
+                                    <small class="text-muted">... and {{ product.failed_count|add:"-3" }} more</small>
+                                {% endif %}
+                            </div>
+                        </details>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+        
+        <!-- Card Footer -->
+        <div class="card-footer bg-transparent">
+            <div class="d-grid gap-2">
+                <button type="button" 
+                        class="btn btn-sm download-zip-btn
+                        {% if product.zip_ready %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                        {% if not product.zip_ready %}disabled{% endif %}
+                        onclick="downloadProductZip('{{ product.product_number }}')">
+                    📦 Download ZIP
+                    {% if product.zip_ready and product.zip_size > 0 %}
+                        <small>({{ product.zip_size|filesizeformat }})</small>
+                    {% endif %}
+                </button>
+                
+                <!-- Optional: Link to product folder view -->
+                <!--
+                <button type="button" class="btn btn-outline-secondary btn-sm" 
+                        onclick="viewProductFolder('{{ product.product_number }}')">
+                    📁 Open Folder
+                </button>
+                -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function downloadProductZip(productNumber) {
+    // Use proper Django URL reverse with escaped values
+    const url = "{% url 'batch_downloader:download_product_zip' job_id=product.job.id product_number='__PRODUCT__' %}".replace('__PRODUCT__', productNumber);
+    window.location.href = url;
+}
+
+function viewProductFolder(productNumber) {
+    // This could open a modal or navigate to a folder view
+    if (typeof showToast !== 'undefined') {
+        showToast(`Opening folder for ${productNumber}`, 'info');
+    }
+}
+</script>
