@@ -56,7 +56,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -89,23 +88,12 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-try:
-    import dj_database_url
-    DATABASES = {
-        'default': dj_database_url.config(
-            default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'),
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
-except ImportError:
-    # Fallback for local development when dj_database_url is not installed
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 
 
 # Password validation
@@ -143,10 +131,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-# WhiteNoise configuration for static files
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -161,6 +145,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Celery Configuration - DISABLED for simplicity
 # Download Configuration
 MAX_GLOBAL_CONCURRENCY = env.int('MAX_GLOBAL_CONCURRENCY', 32)
 MAX_PER_HOST_CONCURRENCY = env.int('MAX_PER_HOST_CONCURRENCY', 4)
@@ -181,6 +166,3 @@ if MEDIA_BACKEND == 's3':
     AWS_S3_REGION_NAME = env.str('AWS_S3_REGION_NAME', 'us-east-1')
     AWS_S3_FILE_OVERWRITE = False
     AWS_DEFAULT_ACL = None
-
-# Worker concurrency configuration for download service
-DOWNLOAD_WORKER_CONCURRENCY = env.int('CELERY_WORKER_CONCURRENCY', 8)

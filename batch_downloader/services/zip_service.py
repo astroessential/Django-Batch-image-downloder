@@ -26,10 +26,14 @@ class ZipService:
                 status='DONE'
             ).exclude(file_path='')
             
+            # Track used filenames to avoid duplicates
+            used_names = set()
+            
             for image in images:
                 if self._file_exists(image.file_path):
-                    # Add file to zip with just the filename (no subfolder)
-                    archive_name = image.filename
+                    # Generate unique archive name
+                    archive_name = self._get_unique_archive_name(image.filename, used_names)
+                    used_names.add(archive_name)
                     
                     if settings.MEDIA_BACKEND == 's3':
                         # For S3, read the file content
@@ -58,6 +62,9 @@ class ZipService:
                 job=job
             ).prefetch_related('images')
             
+            # Track used filenames globally to avoid duplicates across products
+            used_names = set()
+            
             for product_batch in product_batches:
                 completed_images = product_batch.images.filter(status='DONE').exclude(file_path='')
                 
@@ -68,7 +75,10 @@ class ZipService:
                     # Add all images for this product
                     for image in completed_images:
                         if self._file_exists(image.file_path):
-                            archive_name = f"{product_folder}{image.filename}"
+                            # Generate unique filename within the product folder
+                            base_archive_name = f"{product_folder}{image.filename}"
+                            archive_name = self._get_unique_archive_name(base_archive_name, used_names)
+                            used_names.add(archive_name)
                             
                             if settings.MEDIA_BACKEND == 's3':
                                 with default_storage.open(image.file_path, 'rb') as f:
@@ -89,6 +99,22 @@ class ZipService:
             return default_storage.exists(file_path)
         else:
             return os.path.isfile(file_path)
+    
+    def _get_unique_archive_name(self, filename: str, used_names: set) -> str:
+        """Generate a unique archive name by appending a counter if needed"""
+        if filename not in used_names:
+            return filename
+        
+        # Split filename into name and extension
+        name, ext = os.path.splitext(filename)
+        
+        # Try adding a counter until we find a unique name
+        counter = 1
+        while True:
+            unique_name = f"{name}_{counter}{ext}"
+            if unique_name not in used_names:
+                return unique_name
+            counter += 1
     
     def update_product_zip_status(self, product_batch: ProductBatch):
         """Update the ZIP ready status for a product and create the ZIP file"""
@@ -120,12 +146,17 @@ class ZipService:
             # Ensure directory exists
             os.makedirs(os.path.dirname(zip_path), exist_ok=True)
             
+            # Track used filenames to avoid duplicates
+            used_names = set()
+            
             total_size = 0
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 for image in completed_images:
                     if os.path.exists(image.file_path):
-                        # Add file to ZIP with just the filename (no subfolder, no manifest)
-                        arcname = image.filename
+                        # Generate unique archive name
+                        arcname = self._get_unique_archive_name(image.filename, used_names)
+                        used_names.add(arcname)
+                        
                         zip_file.write(image.file_path, arcname)
                         total_size += os.path.getsize(image.file_path)
             

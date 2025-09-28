@@ -156,11 +156,11 @@ let jobCompleted = false;
 function connectSSE() {
     // Don't connect if job is already completed
     if (jobCompleted) {
-        console.log('Job is completed, skipping SSE connection');
+        // console.log('Job is completed, skipping SSE connection');
         return;
     }
     
-    console.log('Connecting to SSE stream...');
+    // console.log('Connecting to SSE stream...');
     updateConnectionStatus(true);
     
     // Close existing connection if any
@@ -172,7 +172,7 @@ function connectSSE() {
     eventSource = new EventSource(streamUrl);
     
     eventSource.onopen = function(event) {
-        console.log('SSE connection opened');
+        // console.log('SSE connection opened');
         updateConnectionStatus(true);
         reconnectAttempts = 0;
     };
@@ -180,12 +180,12 @@ function connectSSE() {
     eventSource.onmessage = function(event) {
         try {
             const data = JSON.parse(event.data);
-            console.log('SSE message:', data);
+            // console.log('SSE message:', data);
             
             // Check if this is the final update
             if (data.final_update || (data.job && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.job.status))) {
                 jobCompleted = true;
-                console.log('Job completed, closing SSE connection');
+                // console.log('Job completed, closing SSE connection');
                 if (eventSource) {
                     eventSource.close();
                     eventSource = null;
@@ -205,7 +205,7 @@ function connectSSE() {
         
         // Don't reconnect if job is completed
         if (jobCompleted) {
-            console.log('Job completed, not reconnecting');
+            // console.log('Job completed, not reconnecting');
             return;
         }
         
@@ -213,10 +213,10 @@ function connectSSE() {
             // Connection was closed, try to reconnect
             if (reconnectAttempts < maxReconnectAttempts) {
                 reconnectAttempts++;
-                console.log(`Reconnecting... (attempt ${reconnectAttempts})`);
+                // console.log(`Reconnecting... (attempt ${reconnectAttempts})`);
                 setTimeout(connectSSE, 2000 * reconnectAttempts);
             } else {
-                console.log('Max reconnection attempts reached, falling back to polling');
+                // console.log('Max reconnection attempts reached, falling back to polling');
                 startPolling();
             }
         }
@@ -226,11 +226,11 @@ function connectSSE() {
 function startPolling() {
     // Don't start polling if job is already completed
     if (jobCompleted) {
-        console.log('Job is completed, skipping polling');
+        // console.log('Job is completed, skipping polling');
         return;
     }
     
-    console.log('Falling back to polling for updates...');
+    // console.log('Falling back to polling for updates...');
     // Poll every 3 seconds for job updates (fallback only)
     const pollingInterval = setInterval(function() {
         // Stop polling if job completed externally
@@ -258,19 +258,19 @@ function startPolling() {
                     jobCompleted = true;
                     clearInterval(pollingInterval);
                     updateConnectionStatus(false, 'Job completed');
-                    console.log('Job finished, stopping polling');
+                    // console.log('Job finished, stopping polling');
                 }
             }
         })
         .catch(error => {
-            console.log('Polling error:', error);
+            // console.log('Polling error:', error);
             // Don't clear interval on error - keep trying
         });
     }, 3000);
 }
 
 function handleProgressUpdate(data) {
-    console.log('Progress update:', data);
+    // console.log('Progress update:', data);
     
     // Handle both SSE data format and polling data format
     if (data.job && data.products) {
@@ -748,7 +748,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(currentStatus)) {
         jobCompleted = true;
         updateConnectionStatus(false, 'Job completed');
-        console.log('Job already completed, skipping SSE connection');
+        // console.log('Job already completed, skipping SSE connection');
     } else {
         connectSSE();
     }

@@ -1,1 +1,1 @@
-# This file intentionally left minimal - no Celery integration needed
+# Django project init file
