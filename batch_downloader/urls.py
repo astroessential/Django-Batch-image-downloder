@@ -1,5 +1,4 @@
 from django.urls import path, include
-from django_eventstream import urls as eventstream_urls
 from . import views
 
 app_name = 'batch_downloader'
