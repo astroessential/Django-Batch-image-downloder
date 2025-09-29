@@ -33,6 +33,7 @@ urlpatterns = [
     # Utilities
     path('sample-csv/', views.sample_csv, name='sample_csv'),
     path('system-check/', views.system_check, name='system_check'),
+    path('health/', views.health_check, name='health_check'),
     
     # EventStream for real-time updates (disabled for now)
     # path('events/', include(eventstream_urls)),

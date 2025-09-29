@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+
+# Environment files
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Media files (these will be created in container)
+media/
+staticfiles/
+
+# Database
+db.sqlite3
+
+# Logs
+*.log
+
+# Documentation
+README.md
+docs/

@@ -30,7 +30,7 @@ SECRET_KEY = env.str('SECRET_KEY', 'django-insecure-c)14&7vw-2_y2j@*-)4!b42*kf$m
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', True)
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', ['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '.coolify.io', '*'])
 
 
 # Application definition
@@ -131,6 +131,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Additional locations of static files for development
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+] if (BASE_DIR / 'static').exists() else []
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -157,6 +163,29 @@ MAX_IMAGE_SIZE_MB = env.int('MAX_IMAGE_SIZE_MB', 50)
 
 # Storage Configuration
 MEDIA_BACKEND = env.str('MEDIA_BACKEND', 'local')
+
+# Security Settings for Production (enable when using HTTPS)
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', False)
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', 0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', False)
+SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', False)
+SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', False)
+CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', False)
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': env.str('LOG_LEVEL', 'INFO'),
+    },
+}
 
 if MEDIA_BACKEND == 's3':
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'

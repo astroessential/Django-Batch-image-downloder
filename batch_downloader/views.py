@@ -554,3 +554,8 @@ def system_check(request):
         'status': 'ok' if all(checks.values()) else 'error',
         'checks': checks
     })
+
+
+def health_check(request):
+    """Simple health check for Coolify and other monitoring tools"""
+    return JsonResponse({'status': 'healthy'}, status=200)
