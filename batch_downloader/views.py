@@ -330,8 +330,12 @@ def job_progress_stream(request, job_id):
             if job.status in ['COMPLETED', 'FAILED', 'CANCELLED']:
                 return
             
-            # Wait 1 second before next update
-            time.sleep(1)
+            # Wait 1 second before next update (non-blocking with gevent)
+            try:
+                import gevent
+                gevent.sleep(1)
+            except ImportError:
+                time.sleep(1)
     
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'

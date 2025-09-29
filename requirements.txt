@@ -13,3 +13,4 @@ django-storages>=1.14.0
 httpx>=0.25.0
 pydantic>=2.0.0
 gunicorn>=21.2.0
+gevent>=23.0.0
