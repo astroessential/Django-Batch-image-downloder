@@ -30,7 +30,14 @@ SECRET_KEY = env.str('SECRET_KEY', 'django-insecure-c)14&7vw-2_y2j@*-)4!b42*kf$m
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', True)
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '.coolify.io', '*'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '.coolify.io', '*.hstgr.cloud', 'jk0o4os00088c0k0w0kwwg0c.srv1032979.hstgr.cloud', '*'])
+
+# CSRF Configuration for Production
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', [
+    'https://jk0o4os00088c0k0w0kwwg0c.srv1032979.hstgr.cloud',
+    'https://*.hstgr.cloud',
+    'https://*.coolify.io'
+])
 
 
 # Application definition
