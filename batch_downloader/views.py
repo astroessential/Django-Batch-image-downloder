@@ -11,7 +11,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from django.db import transaction
 from django.urls import reverse
-from django_ratelimit.decorators import ratelimit
 
 from .models import DownloadJob, ProductBatch, ImageItem
 from .forms import CSVUploadForm, BatchDataForm
