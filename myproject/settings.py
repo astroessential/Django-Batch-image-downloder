@@ -99,6 +99,11 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            'timeout': 20,
+            'check_same_thread': False,  # Allow SQLite to be used across threads
+        },
+        'CONN_MAX_AGE': 0,  # Don't reuse database connections
     }
 }
 
@@ -178,6 +183,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', Fals
 SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', False)
 SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', False)
 CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', False)
+
+# Database connection cleanup
+DATABASE_CONNECTION_POOLING = False
 
 # Logging Configuration
 LOGGING = {

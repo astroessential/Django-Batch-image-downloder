@@ -8,8 +8,8 @@ backlog = 2048
 
 # Worker processes
 workers = multiprocessing.cpu_count() * 2 + 1
-worker_class = "gevent"
-worker_connections = 1000
+worker_class = "sync"  # Changed from gevent to sync for SQLite compatibility
+# worker_connections = 1000  # Not needed for sync workers
 timeout = 120
 keepalive = 2
 
@@ -27,7 +27,7 @@ access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"
 proc_name = "django-batch-downloader"
 
 # Application specific
-preload_app = True
+preload_app = True  # Safe to preload with sync workers
 enable_stdio_inheritance = True
 
 # Security
