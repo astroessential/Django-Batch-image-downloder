@@ -6,7 +6,7 @@ from typing import Dict, List
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, Http404, HttpResponse
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_http_methods, require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from django.db import transaction
@@ -330,12 +330,8 @@ def job_progress_stream(request, job_id):
             if job.status in ['COMPLETED', 'FAILED', 'CANCELLED']:
                 return
             
-            # Wait 1 second before next update (non-blocking with gevent)
-            try:
-                import gevent
-                gevent.sleep(1)
-            except ImportError:
-                time.sleep(1)
+            # Wait 1 second before next update
+            time.sleep(1)
     
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
@@ -562,3 +558,47 @@ def system_check(request):
 def health_check(request):
     """Simple health check for Coolify and other monitoring tools"""
     return JsonResponse({'status': 'healthy'}, status=200)
+
+
+@require_GET
+def job_status_api(request, job_id):
+    """API endpoint for polling job status - alternative to SSE"""
+    try:
+        job = get_object_or_404(DownloadJob, id=job_id)
+        
+        # Collect product data
+        products_data = []
+        total_size_mb = 0
+        
+        for product in job.products.all():
+            products_data.append({
+                'product_number': product.product_number,
+                'status': product.status,
+                'progress_percentage': product.progress_percentage,
+                'downloaded_count': product.downloaded_count,
+                'image_count': product.image_count,
+                'bytes_downloaded_mb': product.bytes_downloaded_mb,
+                'zip_ready': product.zip_ready,
+            })
+            total_size_mb += product.bytes_downloaded / (1024 * 1024) if product.bytes_downloaded else 0
+        
+        # Prepare response data
+        response_data = {
+            'job': {
+                'id': str(job.id),
+                'status': job.status,
+                'progress_percentage': job.progress_percentage,
+                'completed_images': job.completed_images,
+                'total_images': job.total_images,
+                'total_size_mb': round(total_size_mb, 2),
+                'created_at': job.created_at.isoformat(),
+                'updated_at': job.updated_at.isoformat(),
+            },
+            'products': products_data,
+            'is_complete': job.status in ['COMPLETED', 'FAILED', 'CANCELLED']
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

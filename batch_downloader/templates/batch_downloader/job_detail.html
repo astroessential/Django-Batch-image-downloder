@@ -231,6 +231,8 @@ function startPolling() {
     }
     
     // console.log('Falling back to polling for updates...');
+    updateConnectionStatus(false, 'Using polling updates');
+    
     // Poll every 3 seconds for job updates (fallback only)
     const pollingInterval = setInterval(function() {
         // Stop polling if job completed externally
@@ -239,7 +241,9 @@ function startPolling() {
             return;
         }
         
-        fetch(window.location.href, {
+        // Use the status API endpoint for polling
+        const statusUrl = `{% url 'batch_downloader:job_status_api' job.id %}`;
+        fetch(statusUrl, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
@@ -248,13 +252,12 @@ function startPolling() {
         .then(data => {
             if (data.job) {
                 handleProgressUpdate({
-                    type: 'job.totals_updated',
                     job: data.job,
                     products: data.products
                 });
                 
                 // Stop polling if job is complete
-                if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.job.status)) {
+                if (data.is_complete || ['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.job.status)) {
                     jobCompleted = true;
                     clearInterval(pollingInterval);
                     updateConnectionStatus(false, 'Job completed');
@@ -263,7 +266,7 @@ function startPolling() {
             }
         })
         .catch(error => {
-            // console.log('Polling error:', error);
+            console.error('Polling error:', error);
             // Don't clear interval on error - keep trying
         });
     }, 3000);

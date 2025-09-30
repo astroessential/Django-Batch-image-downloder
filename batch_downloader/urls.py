@@ -22,6 +22,8 @@ urlpatterns = [
     
     # Real-time updates (SSE)
     path('jobs/<uuid:job_id>/stream/', views.job_progress_stream, name='job_progress_stream'),
+    # Alternative polling endpoint
+    path('jobs/<uuid:job_id>/status/', views.job_status_api, name='job_status_api'),
     
     # Downloads
     path('jobs/<uuid:job_id>/product/<str:product_number>/zip/', 
