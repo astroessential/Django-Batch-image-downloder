@@ -16,10 +16,11 @@ class ZipService:
     
     def stream_product_zip(self, product_batch: ProductBatch) -> HttpResponse:
         """Create a ZIP file for a single product"""
-        # Create in-memory ZIP
+        # Create in-memory ZIP with optimized compression
         buffer = BytesIO()
+        compression_level = getattr(settings, 'ZIP_COMPRESSION_LEVEL', 1)
         
-        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=compression_level) as zf:
             # Get all completed images for this product
             images = ImageItem.objects.filter(
                 product_batch=product_batch,
@@ -53,10 +54,11 @@ class ZipService:
     
     def stream_all_products_zip(self, job) -> HttpResponse:
         """Create a ZIP file containing all products"""
-        # Create in-memory ZIP
+        # Create in-memory ZIP with optimized compression
         buffer = BytesIO()
+        compression_level = getattr(settings, 'ZIP_COMPRESSION_LEVEL', 1)
         
-        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED, compresslevel=compression_level) as zf:
             # Get all product batches with completed images
             product_batches = ProductBatch.objects.filter(
                 job=job
@@ -150,7 +152,8 @@ class ZipService:
             used_names = set()
             
             total_size = 0
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            compression_level = getattr(settings, 'ZIP_COMPRESSION_LEVEL', 1)
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=compression_level) as zip_file:
                 for image in completed_images:
                     if os.path.exists(image.file_path):
                         # Generate unique archive name
