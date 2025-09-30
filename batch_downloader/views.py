@@ -330,8 +330,12 @@ def job_progress_stream(request, job_id):
             if job.status in ['COMPLETED', 'FAILED', 'CANCELLED']:
                 return
             
-            # Wait 1 second before next update
-            time.sleep(1)
+            # Send heartbeat every 15 updates to prevent timeouts (more frequent)
+            if update_count % 15 == 0:
+                yield f": heartbeat-{update_count}\n\n"
+            
+            # Shorter sleep for more responsive updates
+            time.sleep(0.5)
     
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'

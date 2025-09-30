@@ -10,8 +10,9 @@ backlog = 2048
 workers = multiprocessing.cpu_count() * 2 + 1
 worker_class = "sync"  # Changed from gevent to sync for SQLite compatibility
 # worker_connections = 1000  # Not needed for sync workers
-timeout = 120
-keepalive = 2
+timeout = 600  # Increased timeout for very long-running operations (10 minutes)
+keepalive = 10  # Keep connections alive longer
+graceful_timeout = 120  # Give workers more time to finish requests during restarts
 
 # Restart workers after this many requests, to prevent memory leaks
 max_requests = 1000

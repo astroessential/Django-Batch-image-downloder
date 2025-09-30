@@ -61,7 +61,8 @@ class SimpleDownloadProcessor:
                 tasks.append(self._download_single_image(item))
             
             # Process in batches to avoid overwhelming the system
-            batch_size = 5
+            from django.conf import settings
+            batch_size = getattr(settings, 'MAX_GLOBAL_CONCURRENCY', 48)
             for i in range(0, len(tasks), batch_size):
                 batch = tasks[i:i + batch_size]
                 await asyncio.gather(*batch, return_exceptions=True)

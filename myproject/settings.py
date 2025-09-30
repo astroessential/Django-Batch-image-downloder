@@ -164,17 +164,21 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Celery Configuration - DISABLED for simplicity
-# Download Configuration
-MAX_GLOBAL_CONCURRENCY = env.int('MAX_GLOBAL_CONCURRENCY', 32)
-MAX_PER_HOST_CONCURRENCY = env.int('MAX_PER_HOST_CONCURRENCY', 4)
-DOWNLOAD_QPS = env.int('DOWNLOAD_QPS', 20)
-HTTP_CONNECT_TIMEOUT = env.int('HTTP_CONNECT_TIMEOUT', 5)
-HTTP_READ_TIMEOUT = env.int('HTTP_READ_TIMEOUT', 45)
-HTTP_WRITE_TIMEOUT = env.int('HTTP_WRITE_TIMEOUT', 45)
-MAX_IMAGE_SIZE_MB = env.int('MAX_IMAGE_SIZE_MB', 50)
+# Download Configuration - Optimized for production
+MAX_GLOBAL_CONCURRENCY = env.int('MAX_GLOBAL_CONCURRENCY', 48)  # Increased for better throughput
+MAX_PER_HOST_CONCURRENCY = env.int('MAX_PER_HOST_CONCURRENCY', 6)  # Increased for better throughput
+DOWNLOAD_QPS = env.int('DOWNLOAD_QPS', 30)  # Increased for faster downloads
+HTTP_CONNECT_TIMEOUT = env.int('HTTP_CONNECT_TIMEOUT', 10)  # Increased for unstable connections
+HTTP_READ_TIMEOUT = env.int('HTTP_READ_TIMEOUT', 60)  # Increased for large files
+HTTP_WRITE_TIMEOUT = env.int('HTTP_WRITE_TIMEOUT', 60)  # Increased for large files
+MAX_IMAGE_SIZE_MB = env.int('MAX_IMAGE_SIZE_MB', 100)  # Increased limit
 
 # Storage Configuration
 MEDIA_BACKEND = env.str('MEDIA_BACKEND', 'local')
+
+# ZIP Creation Settings (Optimized for speed)
+ZIP_COMPRESSION_LEVEL = env.int('ZIP_COMPRESSION_LEVEL', 1)  # Fast compression for production
+MAX_ZIP_SIZE = env.int('MAX_ZIP_SIZE', 10737418240)  # 10GB limit
 
 # Security Settings for Production (enable when using HTTPS)
 SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', False)
